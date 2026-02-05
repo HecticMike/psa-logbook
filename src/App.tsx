@@ -36,6 +36,10 @@ import {
 } from './lib/drive';
 import './index.css';
 
+type ThemeSetting = 'light' | 'dark' | 'system';
+
+const THEME_KEY = 'theme';
+
 type LogFormState = {
   startAt: string;
   endAt: string;
@@ -192,6 +196,13 @@ const jointHelperText = (regionKey: string, jointKey: string): string | null => 
 };
 
 export default function App() {
+  const [themeSetting, setThemeSetting] = useState<ThemeSetting>(() => {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
+    }
+    return 'system';
+  });
   const [rememberedRegionKey, setRememberedRegionKey] = useState('');
   const [form, setForm] = useState<LogFormState>(initialForm());
   const [formMessage, setFormMessage] = useState<string | null>(null);
@@ -205,6 +216,22 @@ export default function App() {
   const [driveMessage, setDriveMessage] = useState<string | null>(null);
   const [isDriveBusy, setDriveBusy] = useState(false);
   const [backupTimeframe, setBackupTimeframe] = useState<TimeframeKey>('all');
+
+  const applyThemeSetting = useCallback((setting: ThemeSetting) => {
+    localStorage.setItem(THEME_KEY, setting);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const resolved = setting === 'system' ? (prefersDark ? 'dark' : 'light') : setting;
+    document.documentElement.dataset.theme = resolved;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      const color = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      if (color) meta.setAttribute('content', color);
+    }
+  }, []);
+
+  useEffect(() => {
+    applyThemeSetting(themeSetting);
+  }, [themeSetting, applyThemeSetting]);
 
   useEffect(() => {
     getMeta('lastUsedRegionKey').then((saved) => {
@@ -453,14 +480,25 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">
+        <div className="topbar-inner">
           <div className="wordmark">PsA</div>
-          <div className="subtitle">Logbook</div>
-        </div>
-        <div className="topbar-status">
-          <span className={`badge ${driveStatus.connected ? 'badge-success' : 'badge-muted'}`}>
-            {driveStatus.connected ? 'Drive connected' : 'Offline ready'}
-          </span>
+          <div className="topbar-actions">
+            <div className="theme-toggle" role="group" aria-label="Theme">
+              {(['system', 'dark', 'light'] as ThemeSetting[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`theme-option ${themeSetting === mode ? 'active' : ''}`}
+                  onClick={() => setThemeSetting(mode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <span className={`badge ${driveStatus.connected ? 'badge-success' : 'badge-muted'}`}>
+              {driveStatus.connected ? 'Drive connected' : 'Offline ready'}
+            </span>
+          </div>
         </div>
       </header>
       <nav className="tabs">
