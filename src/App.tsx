@@ -164,6 +164,16 @@ const drillLabelForEvent = (event: EventRecord, level: DrillLevel): string | nul
   return option ? option.label : key;
 };
 
+const jointHelperText = (regionKey: string, jointKey: string): string | null => {
+  if (regionKey === 'hands' && jointKey === 'fingers') {
+    return 'MCP = knuckle at the base · PIP = middle joint · DIP = joint closest to the fingertip · IP = thumb joint · CMC = thumb base near the wrist';
+  }
+  if (regionKey === 'feet' && jointKey === 'toes') {
+    return 'MCP = knuckle at the base · PIP = middle joint · DIP = joint closest to the toe tip · IP = big toe joint · MTP = toe knuckle at the base';
+  }
+  return null;
+};
+
 export default function App() {
   const [rememberedRegionKey, setRememberedRegionKey] = useState('');
   const [form, setForm] = useState<LogFormState>(initialForm());
@@ -197,6 +207,7 @@ export default function App() {
     () => drilldownsFor(form.regionKey, form.jointKey),
     [form.regionKey, form.jointKey]
   );
+  const jointHelper = jointHelperText(form.regionKey, form.jointKey);
   const getDrillKey = (field: 'drill1' | 'drill2') =>
     field === 'drill1' ? form.drill1Key : form.drill2Key;
   const getDrillCustom = (field: 'drill1' | 'drill2') =>
@@ -477,6 +488,7 @@ export default function App() {
                   </option>
                 ))}
               </select>
+              {jointHelper && <p className="helper-text">{jointHelper}</p>}
             </label>
           )}
           {drillLevels.map((level) => {

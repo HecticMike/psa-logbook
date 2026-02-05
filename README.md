@@ -5,6 +5,7 @@ PsA Logbook is a mobile-first PWA for psoriatic arthritis tracking. It keeps eve
 ## Lookup lists
 
 Dropdown options for regions, joints, symptoms, triggers, actions, and timeframes are maintained inside `src/lib/lookups.ts`. Edit that file to change labels or add new entries (stable keys are essential so saved records keep matching). Each list includes an `OTHER_KEY` entry to surface a free-text box when “Other” is chosen.
+Finger and toe drilldowns rely on stable joints (MCP, PIP, DIP, IP, CMC, MTP) to keep exports deterministic; use the Notes field for anatomy not covered above.
 
 ## Local development
 

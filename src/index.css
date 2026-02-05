@@ -67,6 +67,12 @@ label {
   color: #0f172a;
 }
 
+.helper-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
 input,
 textarea,
 select {

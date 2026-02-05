@@ -90,8 +90,7 @@ export const DRILLDOWNS_BY_REGION_JOINT: Record<string, Record<string, DrillLeve
           { key: 'index', label: 'Index' },
           { key: 'middle', label: 'Middle' },
           { key: 'ring', label: 'Ring' },
-          { key: 'little', label: 'Little' },
-          { key: OTHER_KEY, label: 'Other finger' }
+          { key: 'little', label: 'Little' }
         ]
       },
       {
@@ -101,7 +100,8 @@ export const DRILLDOWNS_BY_REGION_JOINT: Record<string, Record<string, DrillLeve
           { key: 'mcp', label: 'MCP' },
           { key: 'pip', label: 'PIP' },
           { key: 'dip', label: 'DIP' },
-          { key: OTHER_KEY, label: 'Other finger joint' }
+          { key: 'ip', label: 'IP' },
+          { key: 'cmc', label: 'CMC' }
         ]
       }
     ]
@@ -116,8 +116,7 @@ export const DRILLDOWNS_BY_REGION_JOINT: Record<string, Record<string, DrillLeve
           { key: 'second', label: '2nd toe' },
           { key: 'third', label: '3rd toe' },
           { key: 'fourth', label: '4th toe' },
-          { key: 'little', label: '5th toe' },
-          { key: OTHER_KEY, label: 'Other toe' }
+          { key: 'little', label: '5th toe' }
         ]
       },
       {
@@ -127,7 +126,7 @@ export const DRILLDOWNS_BY_REGION_JOINT: Record<string, Record<string, DrillLeve
           { key: 'mtp', label: 'MTP' },
           { key: 'pip', label: 'PIP' },
           { key: 'dip', label: 'DIP' },
-          { key: OTHER_KEY, label: 'Other toe joint' }
+          { key: 'ip', label: 'IP' }
         ]
       }
     ]
