@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { DRIVE_FILE_NAME, DRIVE_FOLDER_NAME } from './config';
 import {
   createEvent,
   deleteEvent,
@@ -916,13 +915,6 @@ export default function App() {
             >
               Restore from Drive
             </button>
-          </div>
-          <div className="backup-note">
-            <p>
-              Google tokens stay in memory only. Folder <strong>{DRIVE_FOLDER_NAME}</strong> and file{' '}
-              <strong>{DRIVE_FILE_NAME}</strong> are visible in your Drive.
-            </p>
-            <p>Drive is optional — the app works fully locally. Use backup buttons when ready.</p>
           </div>
         </div>
         {driveMessage && <p className="message">{driveMessage}</p>}
