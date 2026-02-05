@@ -494,9 +494,6 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <span className={`badge ${driveStatus.connected ? 'badge-success' : 'badge-muted'}`}>
-              {driveStatus.connected ? 'Drive connected' : 'Offline ready'}
-            </span>
           </div>
         </div>
       </header>
