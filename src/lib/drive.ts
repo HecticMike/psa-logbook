@@ -261,19 +261,12 @@ export async function backupToDrive(): Promise<string> {
   await ensureFileInFolder(fileId, folderId);
   const payload = await exportAllEventsAsJson();
   const content = JSON.stringify(payload);
-  const { boundary, body } = createMultipartBody(
-    {
-      name: DRIVE_FILE_NAME,
-      mimeType: 'application/json'
-    },
-    content
-  );
-  await fetchWithAuth(`${DRIVE_UPLOAD_BASE}/files/${fileId}?uploadType=multipart`, {
+  await fetchWithAuth(`${DRIVE_UPLOAD_BASE}/files/${fileId}?uploadType=media`, {
     method: 'PATCH',
     headers: {
-      'Content-Type': `multipart/related; boundary=${boundary}`
+      'Content-Type': 'application/json'
     },
-    body
+    body: content
   });
   await setMetaNumber('lastBackupAt', Date.now());
   return 'Backup complete';
