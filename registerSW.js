@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/psa-logbook/sw.js', { scope: '/psa-logbook/' })})}
