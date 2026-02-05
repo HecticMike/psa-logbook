@@ -212,6 +212,29 @@ async function fetchDriveList(query: string) {
   return response.json();
 }
 
+async function ensureFileInFolder(fileId: string, folderId: string): Promise<void> {
+  const response = await fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}?fields=parents`, { method: 'GET' });
+  const data = (await response.json()) as { parents?: string[] };
+  const parents = data.parents ?? [];
+  if (parents.includes(folderId)) {
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set('addParents', folderId);
+  if (parents.length > 0) {
+    params.set('removeParents', parents.join(','));
+  }
+
+  await fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}?${params.toString()}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({})
+  });
+}
+
 export async function connectDrive(): Promise<DriveStatus> {
   await requestAccessToken();
   return getDriveStatus();
@@ -235,12 +258,12 @@ export async function getDriveStatus(): Promise<DriveStatus> {
 export async function backupToDrive(): Promise<string> {
   const folderId = await ensureFolder();
   const fileId = await ensureFile(folderId);
+  await ensureFileInFolder(fileId, folderId);
   const payload = await exportAllEventsAsJson();
   const content = JSON.stringify(payload);
   const { boundary, body } = createMultipartBody(
     {
       name: DRIVE_FILE_NAME,
-      parents: [folderId],
       mimeType: 'application/json'
     },
     content
@@ -259,6 +282,7 @@ export async function backupToDrive(): Promise<string> {
 export async function restoreFromDrive(): Promise<{ imported: number }> {
   const folderId = await ensureFolder();
   const fileId = await ensureFile(folderId);
+  await ensureFileInFolder(fileId, folderId);
   const response = await fetchWithAuth(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, { method: 'GET' });
   const json = (await response.json()) as ExportedEvents;
   const result = await importEventsFromJson(json);
