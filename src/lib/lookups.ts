@@ -28,26 +28,21 @@ export const JOINT_OPTIONS_BY_REGION: Record<string, Option[]> = {
   hands: [
     { key: 'fingers', label: 'Fingers' },
     { key: 'wrists', label: 'Wrists' },
-    { key: OTHER_KEY, label: 'Other (hands)' }
   ],
   knees: [
     { key: 'left-knee', label: 'Left knee' },
     { key: 'right-knee', label: 'Right knee' },
-    { key: OTHER_KEY, label: 'Other (knee)' }
   ],
   spine: [
     { key: 'lumbar', label: 'Lower back (lumbar)' },
     { key: 'thoracic', label: 'Mid-back (thoracic)' },
-    { key: OTHER_KEY, label: 'Other (spine)' }
   ],
   feet: [
     { key: 'ankles', label: 'Ankles' },
     { key: 'toes', label: 'Toes' },
-    { key: OTHER_KEY, label: 'Other (feet)' }
   ],
   neck: [
     { key: 'cervical', label: 'Cervical region' },
-    { key: OTHER_KEY, label: 'Other (neck)' }
   ],
   hips: [{ key: 'hips', label: 'Hips' }]
 };
@@ -153,6 +148,26 @@ export function jointsForRegion(regionKey?: string): Option[] | undefined {
 
 export function hasOtherSelected(key?: string): boolean {
   return key === OTHER_KEY;
+}
+
+const SIDE_HIDE_REGIONS = new Set(['spine', 'neck']);
+
+export function sideModeForSelection(regionKey?: string, jointKey?: string): 'show' | 'hide' {
+  if (regionKey && SIDE_HIDE_REGIONS.has(regionKey)) {
+    return 'hide';
+  }
+  if (jointKey) {
+    const lowerKey = jointKey.toLowerCase();
+    if (lowerKey.includes('left') || lowerKey.includes('right') || lowerKey.includes('both')) {
+      return 'hide';
+    }
+    const jointOptions = jointsForRegion(regionKey);
+    const match = jointOptions?.find((option) => option.key === jointKey);
+    if (match && /(Left|Right|Both)/.test(match.label)) {
+      return 'hide';
+    }
+  }
+  return 'show';
 }
 
 // Add more entries above and restart Vite; the selectors and exports will

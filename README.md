@@ -49,9 +49,9 @@ Drive backups work with scope `https://www.googleapis.com/auth/drive.file`, the 
 - **Local-first:** logging, filters, and recap are usable offline. Drive is optional and disabled until you configure Google.
 - **Backup flow:** `Connect Google Drive` prompts for consent, then `Backup now` exports all events to the Drive file via a multipart PATCH request. `Restore from Drive` downloads that JSON and merges it by `id`, keeping whichever record has the newest `updatedAt`. The timeframe selector uses approximate days (year = 365, six months = 183, month = 30, week = 7) when slicing the dataset before export.
 - **JSON export/import:** Use the `Export JSON` button to download a copy. Use the `Import JSON` input to merge a saved file by the same rules.
-- **CSV export:** `Export CSV` downloads deterministic rows that include region/joint keys, symptom/trigger/action keys + custom text, and the `side` value. The file appears as `psa-logbook-events.csv`.
+- **Excel export:** `Export Excel` creates a styled `.xlsx` workbook (sheet “PsA Logbook”) whose headers read `Start date`, `End date`, `Region`, `Joint`, `Detail 1`, `Detail 2`, `Side`, `Symptom`, `Pain (0-10)`, `Stiffness (min)`, `Swelling (0-3)`, `Trigger`, `Action taken`, and `Notes`. Dates use `DD-MMM-YY` (e.g., `05-Feb-26`), the timeframe filters plus region/joint filters control the rows, and the downloaded file name follows `psa-logbook-<timeframe>-<YYYYMMDD>.xlsx`.
 - **Drive visibility:** The folder `PsA-Logbook` and file `psa-logbook-data.json` remain visible within your Google Drive. There is no hidden storage. Imports/restore merges follow the same "latest updatedAt wins" rule.
-- **Side selection:** The log form’s Left/Right tickboxes map to `left`, `right`, `both`, or `''` (none). This value is stored with each event and is exported alongside the rest of the metadata.
+- **Side selection:** The log form’s Left/Right tickboxes map to `left`, `right`, `both`, or `''` (none), though the selectors hide automatically when you pick a midline region (like spine/neck) or a joint that already encodes laterality (e.g., left/right knee). The stored value is still exported with the rest of the metadata.
 
 ## Testing / smoke checks
 

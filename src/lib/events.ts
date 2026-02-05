@@ -1,6 +1,17 @@
 import { v4 as uuid } from 'uuid';
 import { db, type EventRecord } from './db';
-import type { TimeframeKey } from './lookups';
+import { utils, write } from 'xlsx-js-style';
+import {
+  ACTION_OPTIONS,
+  drilldownsFor,
+  jointsForRegion,
+  labelForKey,
+  OTHER_KEY,
+  REGION_OPTIONS,
+  SYMPTOM_OPTIONS,
+  TRIGGER_OPTIONS
+} from './lookups';
+import type { DrillLevel, Option, TimeframeKey } from './lookups';
 
 export type { EventRecord };
 
@@ -153,57 +164,141 @@ export async function exportEventsAsJson(options: ExportOptions): Promise<string
   return JSON.stringify(payload, null, 2);
 }
 
-export async function exportEventsAsCsv(options: ExportOptions): Promise<string> {
+
+const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const formatDateForExport = (value?: number): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = MONTH_ABBREVIATIONS[date.getMonth()];
+  const year = date.getFullYear().toString().slice(-2);
+  return `${day}-${month}-${year}`;
+};
+
+const formatOptionWithCustom = (key: string | undefined, custom: string | undefined, options: Option[]): string => {
+  if (!key) return 'Unspecified';
+  if (key === OTHER_KEY) {
+    if (custom && custom.trim()) {
+      return custom.trim();
+    }
+    return 'Other';
+  }
+  const label = labelForKey(options, key);
+  if (custom && custom.trim()) {
+    return `${label} (${custom.trim()})`;
+  }
+  return label;
+};
+
+const formatSideLabel = (side: '' | 'left' | 'right' | 'both'): string => {
+  switch (side) {
+    case 'left':
+      return 'Left';
+    case 'right':
+      return 'Right';
+    case 'both':
+      return 'Left & Right';
+    default:
+      return '';
+  }
+};
+
+const getDrillLabelForExport = (event: EventRecord, level: DrillLevel): string => {
+  const key = level.field === 'drill1' ? event.drill1Key : event.drill2Key;
+  const custom = level.field === 'drill1' ? event.drill1Custom : event.drill2Custom;
+  if (!key) return '';
+  if (key === OTHER_KEY) {
+    if (custom && custom.trim()) return custom.trim();
+    const otherOption = level.options.find((option) => option.key === OTHER_KEY);
+    return otherOption?.label ?? 'Other';
+  }
+  const option = level.options.find((entry) => entry.key === key);
+  return option ? option.label : key;
+};
+
+const COLUMN_HEADERS = [
+  'Start date',
+  'End date',
+  'Region',
+  'Joint',
+  'Detail 1',
+  'Detail 2',
+  'Side',
+  'Symptom',
+  'Pain (0-10)',
+  'Stiffness (min)',
+  'Swelling (0-3)',
+  'Trigger',
+  'Action taken',
+  'Notes'
+];
+
+export async function exportEventsAsXlsx(options: ExportOptions): Promise<Blob> {
   const events = await filterByExportOptions(options);
-  const headers = [
-    'id',
-    'startAt',
-    'endAt',
-    'pain',
-    'region',
-    'regionKey',
-    'jointKey',
-    'drill1Key',
-    'drill1Custom',
-    'drill2Key',
-    'drill2Custom',
-    'symptomKey',
-    'symptomCustom',
-    'triggerKey',
-    'triggerCustom',
-    'actionKey',
-    'actionCustom',
-    'side',
-    'notes'
-  ];
   const rows = events.map((event) => {
-    const start = new Date(event.startAt).toISOString();
-    const end = event.endAt ? new Date(event.endAt).toISOString() : '';
+    const regionLabel = event.regionKey
+      ? labelForKey(REGION_OPTIONS, event.regionKey)
+      : event.region;
+    const jointOptions = jointsForRegion(event.regionKey ?? '');
+    const jointLabel = event.jointKey
+      ? labelForKey(jointOptions ?? [], event.jointKey)
+      : event.jointKey ?? '';
+    const drillLevels = drilldownsFor(event.regionKey ?? '', event.jointKey ?? '');
+    const detailLabels = drillLevels.map((level) => getDrillLabelForExport(event, level));
     return [
-      event.id,
-      start,
-      end,
+      formatDateForExport(event.startAt),
+      event.endAt ? formatDateForExport(event.endAt) : '',
+      regionLabel,
+      jointLabel,
+      detailLabels[0] ?? '',
+      detailLabels[1] ?? '',
+      formatSideLabel(event.side ?? ''),
+      formatOptionWithCustom(event.symptomKey, event.symptomCustom, SYMPTOM_OPTIONS),
       event.pain.toString(),
-      event.region,
-      event.regionKey ?? '',
-      event.jointKey ?? '',
-      event.drill1Key ?? '',
-      event.drill1Custom ?? '',
-      event.drill2Key ?? '',
-      event.drill2Custom ?? '',
-      event.symptomKey ?? '',
-      event.symptomCustom ?? '',
-      event.triggerKey ?? '',
-      event.triggerCustom ?? '',
-      event.actionKey ?? '',
-      event.actionCustom ?? '',
-      event.side ?? '',
-      event.notes.replace(/\r?\n/g, '\\n')
-    ]
-      .map((value) => `"${value.replace(/"/g, '""')}"`)
-      .join(',');
+      '',
+      '',
+      formatOptionWithCustom(event.triggerKey, event.triggerCustom, TRIGGER_OPTIONS),
+      formatOptionWithCustom(event.actionKey, event.actionCustom, ACTION_OPTIONS),
+      event.notes ?? ''
+    ];
   });
-  return [headers.join(','), ...rows].join('\n');
+  const table = [COLUMN_HEADERS, ...rows];
+  const ws = utils.aoa_to_sheet(table);
+  const headerStyle = {
+    font: { bold: true },
+    fill: { patternType: 'solid', fgColor: { rgb: 'FFF4F5F7' } }
+  };
+  COLUMN_HEADERS.forEach((_, columnIndex) => {
+    const address = utils.encode_cell({ c: columnIndex, r: 0 });
+    const cell = ws[address];
+    if (cell) {
+      cell.s = headerStyle;
+    }
+  });
+  ws['!cols'] = [
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 30 }
+  ];
+  ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, 'PsA Logbook');
+  const arrayBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([arrayBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
 }
 
 async function filterByExportOptions(options: ExportOptions): Promise<EventRecord[]> {

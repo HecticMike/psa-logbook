@@ -4,8 +4,8 @@ import { APP_NAME, DRIVE_FILE_NAME, DRIVE_FOLDER_NAME } from './config';
 import {
   createEvent,
   deleteEvent,
-  exportEventsAsCsv,
   exportEventsAsJson,
+  exportEventsAsXlsx,
   listEvents,
   updateEvent,
   type EventRecord,
@@ -22,7 +22,8 @@ import {
   REGION_OPTIONS,
   SYMPTOM_OPTIONS,
   TIMEFRAME_OPTIONS,
-  TRIGGER_OPTIONS
+  TRIGGER_OPTIONS,
+  sideModeForSelection
 } from './lib/lookups';
 import type { DrillLevel, TimeframeKey } from './lib/lookups';
 import {
@@ -149,6 +150,22 @@ const downloadTextFile = (filename: string, content: string, mime: string) => {
   URL.revokeObjectURL(url);
 };
 
+const downloadBlob = (filename: string, blob: Blob) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const formatFilenameDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+};
+
 const drillLabelForEvent = (event: EventRecord, level: DrillLevel): string | null => {
   const key = level.field === 'drill1' ? event.drill1Key : event.drill2Key;
   const custom = level.field === 'drill1' ? event.drill1Custom : event.drill2Custom;
@@ -207,6 +224,7 @@ export default function App() {
     () => drilldownsFor(form.regionKey, form.jointKey),
     [form.regionKey, form.jointKey]
   );
+  const sideMode = sideModeForSelection(form.regionKey, form.jointKey);
   const jointHelper = jointHelperText(form.regionKey, form.jointKey);
   const getDrillKey = (field: 'drill1' | 'drill2') =>
     field === 'drill1' ? form.drill1Key : form.drill2Key;
@@ -270,6 +288,17 @@ export default function App() {
 
   const rememberedRegionLabel = rememberedRegionKey ? labelForKey(REGION_OPTIONS, rememberedRegionKey) : '';
 
+  useEffect(() => {
+    if (sideMode === 'hide') {
+      setForm((prev) => {
+        if (!prev.sideLeft && !prev.sideRight) {
+          return prev;
+        }
+        return { ...prev, sideLeft: false, sideRight: false };
+      });
+    }
+  }, [sideMode]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormMessage(null);
@@ -286,7 +315,7 @@ export default function App() {
       triggerCustom: form.triggerCustom,
       actionKey: form.actionKey,
       actionCustom: form.actionCustom,
-      side: deriveSide(form.sideLeft, form.sideRight),
+      side: sideMode === 'show' ? deriveSide(form.sideLeft, form.sideRight) : '',
       drill1Key: form.drill1Key || undefined,
       drill1Custom: form.drill1Custom,
       drill2Key: form.drill2Key || undefined,
@@ -374,14 +403,15 @@ export default function App() {
     downloadTextFile('psa-logbook-events.json', payload, 'application/json');
   };
 
-  const handleExportCsv = async () => {
+  const handleExportExcel = async () => {
     const options = {
       timeframe: backupTimeframe,
       regionKey: filters.regionKey,
       jointKey: filters.jointKey
     };
-    const payload = await exportEventsAsCsv(options);
-    downloadTextFile('psa-logbook-events.csv', payload, 'text/csv');
+    const blob = await exportEventsAsXlsx(options);
+    const filename = `psa-logbook-${backupTimeframe}-${formatFilenameDate()}.xlsx`;
+    downloadBlob(filename, blob);
   };
 
   const refreshDriveState = useCallback(async () => {
@@ -590,25 +620,27 @@ export default function App() {
               />
             </label>
           )}
-          <div className="side-group">
-            <p>Side</p>
-            <label className="side-row">
-              <input
-                type="checkbox"
-                checked={form.sideLeft}
-                onChange={(event) => handleFormChange('sideLeft', event.target.checked)}
-              />
-              Left
-            </label>
-            <label className="side-row">
-              <input
-                type="checkbox"
-                checked={form.sideRight}
-                onChange={(event) => handleFormChange('sideRight', event.target.checked)}
-              />
-              Right
-            </label>
-          </div>
+          {sideMode === 'show' && (
+            <div className="side-group">
+              <p>Side</p>
+              <label className="side-row">
+                <input
+                  type="checkbox"
+                  checked={form.sideLeft}
+                  onChange={(event) => handleFormChange('sideLeft', event.target.checked)}
+                />
+                Left
+              </label>
+              <label className="side-row">
+                <input
+                  type="checkbox"
+                  checked={form.sideRight}
+                  onChange={(event) => handleFormChange('sideRight', event.target.checked)}
+                />
+                Right
+              </label>
+            </div>
+          )}
           <label className="full-width">
             Notes
             <textarea
@@ -802,8 +834,8 @@ export default function App() {
             <button type="button" onClick={handleExportJson}>
               Export JSON
             </button>
-            <button type="button" onClick={handleExportCsv}>
-              Export CSV
+            <button type="button" onClick={handleExportExcel}>
+              Export Excel
             </button>
             <button
               type="button"
