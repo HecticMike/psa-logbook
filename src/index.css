@@ -3,10 +3,10 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #030a30;
-  --bg-2: #050f33;
-  --panel: #070f33;
-  --panel-soft: #050d2b;
+  --bg: #030a24;
+  --bg-2: #040f2a;
+  --panel: #061128;
+  --panel-soft: #050f24;
   --border: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.35);
   --border-soft: rgba(255, 255, 255, 0.18);
@@ -396,6 +396,17 @@ button.ghost {
   width: 1rem;
   height: 1rem;
   border-radius: var(--radius);
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  display: inline-grid;
+  place-content: center;
+}
+
+.side-row input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .event-list {
