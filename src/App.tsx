@@ -215,6 +215,7 @@ export default function App() {
   const [driveMessage, setDriveMessage] = useState<string | null>(null);
   const [isDriveBusy, setDriveBusy] = useState(false);
   const [backupTimeframe, setBackupTimeframe] = useState<TimeframeKey>('all');
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
   const applyThemeSetting = useCallback((setting: ThemeSetting) => {
     localStorage.setItem(THEME_KEY, setting);
@@ -411,6 +412,38 @@ export default function App() {
       }
       return merged;
     });
+  };
+
+  const groupedEvents = useMemo(() => {
+    const groups: Record<string, EventRecord[]> = {};
+    const order: string[] = [];
+    events.forEach((eventRecord) => {
+      const dateKey = new Date(eventRecord.startAt).toLocaleDateString();
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+        order.push(dateKey);
+      }
+      groups[dateKey].push(eventRecord);
+    });
+    return order.map((dateKey) => ({
+      dateKey,
+      events: groups[dateKey]
+    }));
+  }, [events]);
+
+  const buildEventSummary = (eventRecord: EventRecord) => {
+    const regionLabel = eventRecord.regionKey
+      ? labelForKey(REGION_OPTIONS, eventRecord.regionKey)
+      : eventRecord.region;
+    const jointOptions = jointsForRegion(eventRecord.regionKey ?? '');
+    const jointLabel = eventRecord.jointKey
+      ? labelForKey(jointOptions ?? [], eventRecord.jointKey)
+      : 'Unspecified joint';
+    const drillLevelsForEvent = drilldownsFor(eventRecord.regionKey ?? '', eventRecord.jointKey ?? '');
+    const drillLabels = drillLevelsForEvent
+      .map((level) => drillLabelForEvent(eventRecord, level))
+      .filter((label): label is string => Boolean(label));
+    return [regionLabel || 'Unspecified region', jointLabel, ...drillLabels].join(' - ');
   };
 
   const baseTimeframeLabel = useMemo(() => {
@@ -794,57 +827,76 @@ export default function App() {
           </div>
           <div className="event-list">
             {events.length === 0 && <p className="empty-state">No entries yet.</p>}
-            {events.map((eventRecord) => {
-              const regionLabel = eventRecord.regionKey
-                ? labelForKey(REGION_OPTIONS, eventRecord.regionKey)
-                : eventRecord.region;
-              const jointOptions = jointsForRegion(eventRecord.regionKey ?? '');
-              const jointLabel = eventRecord.jointKey
-                ? labelForKey(jointOptions ?? [], eventRecord.jointKey)
-                : 'Unspecified joint';
-              const drillLevelsForEvent = drilldownsFor(
-                eventRecord.regionKey ?? '',
-                eventRecord.jointKey ?? ''
-              );
-              const drillLabels = drillLevelsForEvent
-                .map((level) => drillLabelForEvent(eventRecord, level))
-                .filter((label): label is string => Boolean(label));
-              return (
-                <article className="event-card" key={eventRecord.id}>
-                  <div>
-                    <p className="event-date">{new Date(eventRecord.startAt).toLocaleString()}</p>
-                    <p className="event-meta">
-                      Pain {eventRecord.pain}/10 · {regionLabel || 'Unspecified region'} · {jointLabel}
-                    </p>
-                    {drillLabels.length > 0 && (
-                      <p className="event-meta">Drilldown: {drillLabels.join(' · ')}</p>
-                    )}
-                    <p className="event-meta">
-                      Symptom: {labelForKey(SYMPTOM_OPTIONS, eventRecord.symptomKey)}{' '}
-                      {eventRecord.symptomCustom && `(${eventRecord.symptomCustom})`}
-                    </p>
-                    <p className="event-meta">
-                      Trigger: {labelForKey(TRIGGER_OPTIONS, eventRecord.triggerKey)}{' '}
-                      {eventRecord.triggerCustom && `(${eventRecord.triggerCustom})`}
-                    </p>
-                    <p className="event-meta">
-                      Action: {labelForKey(ACTION_OPTIONS, eventRecord.actionKey)}{' '}
-                      {eventRecord.actionCustom && `(${eventRecord.actionCustom})`}
-                    </p>
-                    <p className="event-meta">Side: {sideLabel(eventRecord.side ?? '')}</p>
-                    {eventRecord.notes && <p className="event-notes">{eventRecord.notes}</p>}
-                  </div>
-                  <div className="event-actions">
-                    <button type="button" onClick={() => handleEdit(eventRecord)}>
-                      Edit
-                    </button>
-                    <button type="button" onClick={() => handleDelete(eventRecord)}>
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+            {groupedEvents.map((group) => (
+              <div key={group.dateKey}>
+                <div className="log-group-title">{group.dateKey}</div>
+                {group.events.map((eventRecord) => {
+                  const summary = buildEventSummary(eventRecord);
+                  const timeLabel = new Date(eventRecord.startAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  const isOpen = expandedEventId === eventRecord.id;
+                  const symptomLabel = labelForKey(SYMPTOM_OPTIONS, eventRecord.symptomKey);
+                  const triggerLabel = labelForKey(TRIGGER_OPTIONS, eventRecord.triggerKey);
+                  const actionLabel = labelForKey(ACTION_OPTIONS, eventRecord.actionKey);
+                  const sideText = eventRecord.side ? sideLabel(eventRecord.side) : '';
+                  return (
+                    <div key={eventRecord.id}>
+                      <div
+                        className={`log-row ${isOpen ? 'is-open' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isOpen}
+                        onClick={() => setExpandedEventId(isOpen ? null : eventRecord.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setExpandedEventId(isOpen ? null : eventRecord.id);
+                          }
+                        }}
+                      >
+                        <div className="log-row-time">{timeLabel}</div>
+                        <div className="log-row-main" title={summary}>
+                          {summary}
+                        </div>
+                        <div className="log-row-badge">{eventRecord.pain}/10</div>
+                      </div>
+                      {isOpen && (
+                        <div className="log-row-expanded">
+                          <p>
+                            Symptom: {symptomLabel}
+                            {eventRecord.symptomCustom && ` (${eventRecord.symptomCustom})`}
+                          </p>
+                          {eventRecord.triggerKey && (
+                            <p>
+                              Trigger: {triggerLabel}
+                              {eventRecord.triggerCustom && ` (${eventRecord.triggerCustom})`}
+                            </p>
+                          )}
+                          {eventRecord.actionKey && (
+                            <p>
+                              Action: {actionLabel}
+                              {eventRecord.actionCustom && ` (${eventRecord.actionCustom})`}
+                            </p>
+                          )}
+                          {sideText && <p>Side: {sideText}</p>}
+                          {eventRecord.notes && <p className="event-notes">{eventRecord.notes}</p>}
+                          <div className="log-row-actions">
+                            <button type="button" onClick={() => handleEdit(eventRecord)}>
+                              Edit
+                            </button>
+                            <button type="button" onClick={() => handleDelete(eventRecord)}>
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </section>
 
