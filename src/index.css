@@ -149,6 +149,25 @@ button:disabled {
   width: 100%;
 }
 
+.side-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.side-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 500;
+}
+
+.side-row input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 .event-list {
   display: flex;
   flex-direction: column;

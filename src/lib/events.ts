@@ -18,6 +18,10 @@ export type EventFormValues = {
   actionKey?: string;
   actionCustom?: string;
   side?: '' | 'left' | 'right' | 'both';
+  drill1Key?: string;
+  drill1Custom?: string;
+  drill2Key?: string;
+  drill2Custom?: string;
   notes: string;
 };
 
@@ -47,6 +51,10 @@ export async function createEvent(values: EventFormValues): Promise<EventRecord>
     id: uuid(),
     ...values,
     side: values.side ?? '',
+    drill1Key: values.drill1Key,
+    drill1Custom: values.drill1Custom,
+    drill2Key: values.drill2Key,
+    drill2Custom: values.drill2Custom,
     createdAt: now,
     updatedAt: now
   };
@@ -64,6 +72,10 @@ export async function updateEvent(id: string, values: Partial<EventFormValues>):
     ...current,
     ...values,
     side: values.side ?? current.side ?? '',
+    drill1Key: values.drill1Key ?? current.drill1Key,
+    drill1Custom: values.drill1Custom ?? current.drill1Custom,
+    drill2Key: values.drill2Key ?? current.drill2Key,
+    drill2Custom: values.drill2Custom ?? current.drill2Custom,
     updatedAt
   };
   await db.events.put(updated);
@@ -151,6 +163,10 @@ export async function exportEventsAsCsv(options: ExportOptions): Promise<string>
     'region',
     'regionKey',
     'jointKey',
+    'drill1Key',
+    'drill1Custom',
+    'drill2Key',
+    'drill2Custom',
     'symptomKey',
     'symptomCustom',
     'triggerKey',
@@ -171,6 +187,10 @@ export async function exportEventsAsCsv(options: ExportOptions): Promise<string>
       event.region,
       event.regionKey ?? '',
       event.jointKey ?? '',
+      event.drill1Key ?? '',
+      event.drill1Custom ?? '',
+      event.drill2Key ?? '',
+      event.drill2Custom ?? '',
       event.symptomKey ?? '',
       event.symptomCustom ?? '',
       event.triggerKey ?? '',

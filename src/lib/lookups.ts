@@ -73,6 +73,74 @@ export const ACTION_OPTIONS: Option[] = [
   { key: OTHER_KEY, label: 'Other action' }
 ];
 
+export type DrillLevel = {
+  field: 'drill1' | 'drill2';
+  label: string;
+  options: Option[];
+};
+
+export const DRILLDOWNS_BY_REGION_JOINT: Record<string, Record<string, DrillLevel[]>> = {
+  hands: {
+    fingers: [
+      {
+        field: 'drill1',
+        label: 'Finger',
+        options: [
+          { key: 'thumb', label: 'Thumb' },
+          { key: 'index', label: 'Index' },
+          { key: 'middle', label: 'Middle' },
+          { key: 'ring', label: 'Ring' },
+          { key: 'little', label: 'Little' },
+          { key: OTHER_KEY, label: 'Other finger' }
+        ]
+      },
+      {
+        field: 'drill2',
+        label: 'Finger joint',
+        options: [
+          { key: 'mcp', label: 'MCP' },
+          { key: 'pip', label: 'PIP' },
+          { key: 'dip', label: 'DIP' },
+          { key: OTHER_KEY, label: 'Other finger joint' }
+        ]
+      }
+    ]
+  },
+  feet: {
+    toes: [
+      {
+        field: 'drill1',
+        label: 'Toe',
+        options: [
+          { key: 'big', label: 'Big toe' },
+          { key: 'second', label: '2nd toe' },
+          { key: 'third', label: '3rd toe' },
+          { key: 'fourth', label: '4th toe' },
+          { key: 'little', label: '5th toe' },
+          { key: OTHER_KEY, label: 'Other toe' }
+        ]
+      },
+      {
+        field: 'drill2',
+        label: 'Toe joint',
+        options: [
+          { key: 'mtp', label: 'MTP' },
+          { key: 'pip', label: 'PIP' },
+          { key: 'dip', label: 'DIP' },
+          { key: OTHER_KEY, label: 'Other toe joint' }
+        ]
+      }
+    ]
+  }
+};
+
+export function drilldownsFor(regionKey?: string, jointKey?: string): DrillLevel[] {
+  if (!regionKey || !jointKey) {
+    return [];
+  }
+  return DRILLDOWNS_BY_REGION_JOINT[regionKey]?.[jointKey] ?? [];
+}
+
 export function labelForKey(list: Option[], key?: string): string {
   if (!key) return 'Unspecified';
   const match = list.find((item) => item.key === key);

@@ -14,15 +14,17 @@ import {
 import { getMeta, setMeta } from './lib/db';
 import {
   ACTION_OPTIONS,
+  drilldownsFor,
   hasOtherSelected,
   jointsForRegion,
   labelForKey,
+  OTHER_KEY,
   REGION_OPTIONS,
   SYMPTOM_OPTIONS,
   TIMEFRAME_OPTIONS,
   TRIGGER_OPTIONS
 } from './lib/lookups';
-import type { TimeframeKey } from './lib/lookups';
+import type { DrillLevel, TimeframeKey } from './lib/lookups';
 import {
   backupToDrive,
   connectDrive,
@@ -48,6 +50,10 @@ type LogFormState = {
   actionCustom: string;
   sideLeft: boolean;
   sideRight: boolean;
+  drill1Key: string;
+  drill1Custom: string;
+  drill2Key: string;
+  drill2Custom: string;
   notes: string;
 };
 
@@ -67,12 +73,16 @@ const DEFAULT_FORM: LogFormState = {
   jointKey: '',
   symptomKey: SYMPTOM_OPTIONS[0].key,
   symptomCustom: '',
-  triggerKey: TRIGGER_OPTIONS[0].key,
+  triggerKey: '',
   triggerCustom: '',
-  actionKey: ACTION_OPTIONS[0].key,
+  actionKey: '',
   actionCustom: '',
   sideLeft: false,
   sideRight: false,
+  drill1Key: '',
+  drill1Custom: '',
+  drill2Key: '',
+  drill2Custom: '',
   notes: ''
 };
 
@@ -139,6 +149,21 @@ const downloadTextFile = (filename: string, content: string, mime: string) => {
   URL.revokeObjectURL(url);
 };
 
+const drillLabelForEvent = (event: EventRecord, level: DrillLevel): string | null => {
+  const key = level.field === 'drill1' ? event.drill1Key : event.drill2Key;
+  const custom = level.field === 'drill1' ? event.drill1Custom : event.drill2Custom;
+  if (!key) return null;
+  if (key === OTHER_KEY) {
+    if (custom && custom.trim()) {
+      return custom.trim();
+    }
+    const otherOption = level.options.find((option) => option.key === OTHER_KEY);
+    return otherOption?.label ?? 'Other';
+  }
+  const option = level.options.find((entry) => entry.key === key);
+  return option ? option.label : key;
+};
+
 export default function App() {
   const [rememberedRegionKey, setRememberedRegionKey] = useState('');
   const [form, setForm] = useState<LogFormState>(initialForm());
@@ -168,6 +193,14 @@ export default function App() {
     () => jointsForRegion(filters.regionKey ?? '') ?? [],
     [filters.regionKey]
   );
+  const drillLevels = useMemo(
+    () => drilldownsFor(form.regionKey, form.jointKey),
+    [form.regionKey, form.jointKey]
+  );
+  const getDrillKey = (field: 'drill1' | 'drill2') =>
+    field === 'drill1' ? form.drill1Key : form.drill2Key;
+  const getDrillCustom = (field: 'drill1' | 'drill2') =>
+    field === 'drill1' ? form.drill1Custom : form.drill2Custom;
 
   const handleFormChange = <K extends keyof LogFormState>(field: K, value: LogFormState[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -180,8 +213,48 @@ export default function App() {
       regionLabel: regionKey ? labelForKey(REGION_OPTIONS, regionKey) : '',
       jointKey: '',
       sideLeft: prev.sideLeft,
-      sideRight: prev.sideRight
+      sideRight: prev.sideRight,
+      drill1Key: '',
+      drill1Custom: '',
+      drill2Key: '',
+      drill2Custom: ''
     }));
+  };
+
+  const handleJointChange = (jointKey: string) => {
+    setForm((prev) => ({
+      ...prev,
+      jointKey,
+      drill1Key: '',
+      drill1Custom: '',
+      drill2Key: '',
+      drill2Custom: ''
+    }));
+  };
+
+  const handleDrillChange = (field: 'drill1' | 'drill2', value: string) => {
+    setForm((prev) => {
+      const next = { ...prev };
+      if (field === 'drill1') {
+        next.drill1Key = value;
+        next.drill1Custom = '';
+        next.drill2Key = '';
+        next.drill2Custom = '';
+      } else {
+        next.drill2Key = value;
+        next.drill2Custom = '';
+      }
+      return next;
+    });
+  };
+
+  const handleDrillCustomChange = (field: 'drill1' | 'drill2', value: string) => {
+    setForm((prev) => {
+      if (field === 'drill1') {
+        return { ...prev, drill1Custom: value };
+      }
+      return { ...prev, drill2Custom: value };
+    });
   };
 
   const rememberedRegionLabel = rememberedRegionKey ? labelForKey(REGION_OPTIONS, rememberedRegionKey) : '';
@@ -203,6 +276,10 @@ export default function App() {
       actionKey: form.actionKey,
       actionCustom: form.actionCustom,
       side: deriveSide(form.sideLeft, form.sideRight),
+      drill1Key: form.drill1Key || undefined,
+      drill1Custom: form.drill1Custom,
+      drill2Key: form.drill2Key || undefined,
+      drill2Custom: form.drill2Custom,
       notes: form.notes
     };
 
@@ -243,6 +320,10 @@ export default function App() {
       actionCustom: eventRecord.actionCustom ?? '',
       sideLeft: eventRecord.side === 'left' || eventRecord.side === 'both',
       sideRight: eventRecord.side === 'right' || eventRecord.side === 'both',
+      drill1Key: eventRecord.drill1Key ?? '',
+      drill1Custom: eventRecord.drill1Custom ?? '',
+      drill2Key: eventRecord.drill2Key ?? '',
+      drill2Custom: eventRecord.drill2Custom ?? '',
       notes: eventRecord.notes
     });
     setFormMessage('Editing event. Submit to save.');
@@ -388,10 +469,7 @@ export default function App() {
           {jointOptions.length > 0 && (
             <label>
               Joint
-              <select
-                value={form.jointKey}
-                onChange={(event) => handleFormChange('jointKey', event.target.value)}
-              >
+              <select value={form.jointKey} onChange={(event) => handleJointChange(event.target.value)}>
                 <option value="">Select joint</option>
                 {jointOptions.map((joint) => (
                   <option key={joint.key} value={joint.key}>
@@ -401,6 +479,34 @@ export default function App() {
               </select>
             </label>
           )}
+          {drillLevels.map((level) => {
+            const value = getDrillKey(level.field);
+            const customValue = getDrillCustom(level.field);
+            return (
+              <label key={level.field}>
+                {level.label}
+                <select
+                  value={value}
+                  onChange={(event) => handleDrillChange(level.field, event.target.value)}
+                >
+                  <option value="">—</option>
+                  {level.options.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {value === OTHER_KEY && (
+                  <input
+                    type="text"
+                    value={customValue}
+                    placeholder="Describe other"
+                    onChange={(event) => handleDrillCustomChange(level.field, event.target.value)}
+                  />
+                )}
+              </label>
+            );
+          })}
           <label>
             Symptom type
             <select
@@ -430,6 +536,7 @@ export default function App() {
               value={form.triggerKey}
               onChange={(event) => handleFormChange('triggerKey', event.target.value)}
             >
+              <option value="">—</option>
               {TRIGGER_OPTIONS.map((entry) => (
                 <option key={entry.key} value={entry.key}>
                   {entry.label}
@@ -453,6 +560,7 @@ export default function App() {
               value={form.actionKey}
               onChange={(event) => handleFormChange('actionKey', event.target.value)}
             >
+              <option value="">—</option>
               {ACTION_OPTIONS.map((entry) => (
                 <option key={entry.key} value={entry.key}>
                   {entry.label}
@@ -470,27 +578,25 @@ export default function App() {
               />
             </label>
           )}
-          <label className="checkbox-group">
-            Side
-            <div className="checkboxes">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.sideLeft}
-                  onChange={(event) => handleFormChange('sideLeft', event.target.checked)}
-                />
-                Left
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.sideRight}
-                  onChange={(event) => handleFormChange('sideRight', event.target.checked)}
-                />
-                Right
-              </label>
-            </div>
-          </label>
+          <div className="side-group">
+            <p>Side</p>
+            <label className="side-row">
+              <input
+                type="checkbox"
+                checked={form.sideLeft}
+                onChange={(event) => handleFormChange('sideLeft', event.target.checked)}
+              />
+              Left
+            </label>
+            <label className="side-row">
+              <input
+                type="checkbox"
+                checked={form.sideRight}
+                onChange={(event) => handleFormChange('sideRight', event.target.checked)}
+              />
+              Right
+            </label>
+          </div>
           <label className="full-width">
             Notes
             <textarea
@@ -592,47 +698,57 @@ export default function App() {
         </div>
         <div className="event-list">
           {events.length === 0 && <p className="empty-state">No entries yet.</p>}
-          {events.map((eventRecord) => {
-            const regionLabel = eventRecord.regionKey
-              ? labelForKey(REGION_OPTIONS, eventRecord.regionKey)
-              : eventRecord.region;
-            const jointOptions = jointsForRegion(eventRecord.regionKey ?? '');
-            const jointLabel = eventRecord.jointKey
-              ? labelForKey(jointOptions ?? [], eventRecord.jointKey)
-              : 'None';
-            return (
-              <article className="event-card" key={eventRecord.id}>
-                <div>
-                  <p className="event-date">{new Date(eventRecord.startAt).toLocaleString()}</p>
-                  <p className="event-meta">
-                    Pain {eventRecord.pain}/10 · {regionLabel || 'Unspecified region'} · {jointLabel}
-                  </p>
-                  <p className="event-meta">
-                    Symptom: {labelForKey(SYMPTOM_OPTIONS, eventRecord.symptomKey)}{' '}
-                    {eventRecord.symptomCustom && `(${eventRecord.symptomCustom})`}
-                  </p>
-                  <p className="event-meta">
-                    Trigger: {labelForKey(TRIGGER_OPTIONS, eventRecord.triggerKey)}{' '}
-                    {eventRecord.triggerCustom && `(${eventRecord.triggerCustom})`}
-                  </p>
-                  <p className="event-meta">
-                    Action: {labelForKey(ACTION_OPTIONS, eventRecord.actionKey)}{' '}
-                    {eventRecord.actionCustom && `(${eventRecord.actionCustom})`}
-                  </p>
-                  <p className="event-meta">Side: {sideLabel(eventRecord.side ?? '')}</p>
-                  {eventRecord.notes && <p className="event-notes">{eventRecord.notes}</p>}
-                </div>
-                <div className="event-actions">
-                  <button type="button" onClick={() => handleEdit(eventRecord)}>
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => handleDelete(eventRecord)}>
-                    Delete
-                  </button>
-                </div>
-              </article>
-            );
-          })}
+      {events.map((eventRecord) => {
+        const regionLabel = eventRecord.regionKey
+          ? labelForKey(REGION_OPTIONS, eventRecord.regionKey)
+          : eventRecord.region;
+        const jointOptions = jointsForRegion(eventRecord.regionKey ?? '');
+        const jointLabel = eventRecord.jointKey
+          ? labelForKey(jointOptions ?? [], eventRecord.jointKey)
+          : 'Unspecified joint';
+        const drillLevelsForEvent = drilldownsFor(
+          eventRecord.regionKey ?? '',
+          eventRecord.jointKey ?? ''
+        );
+        const drillLabels = drillLevelsForEvent
+          .map((level) => drillLabelForEvent(eventRecord, level))
+          .filter((label): label is string => Boolean(label));
+        return (
+          <article className="event-card" key={eventRecord.id}>
+            <div>
+              <p className="event-date">{new Date(eventRecord.startAt).toLocaleString()}</p>
+              <p className="event-meta">
+                Pain {eventRecord.pain}/10 · {regionLabel || 'Unspecified region'} · {jointLabel}
+              </p>
+              {drillLabels.length > 0 && (
+                <p className="event-meta">Drilldown: {drillLabels.join(' · ')}</p>
+              )}
+              <p className="event-meta">
+                Symptom: {labelForKey(SYMPTOM_OPTIONS, eventRecord.symptomKey)}{' '}
+                {eventRecord.symptomCustom && `(${eventRecord.symptomCustom})`}
+              </p>
+              <p className="event-meta">
+                Trigger: {labelForKey(TRIGGER_OPTIONS, eventRecord.triggerKey)}{' '}
+                {eventRecord.triggerCustom && `(${eventRecord.triggerCustom})`}
+              </p>
+              <p className="event-meta">
+                Action: {labelForKey(ACTION_OPTIONS, eventRecord.actionKey)}{' '}
+                {eventRecord.actionCustom && `(${eventRecord.actionCustom})`}
+              </p>
+              <p className="event-meta">Side: {sideLabel(eventRecord.side ?? '')}</p>
+              {eventRecord.notes && <p className="event-notes">{eventRecord.notes}</p>}
+            </div>
+            <div className="event-actions">
+              <button type="button" onClick={() => handleEdit(eventRecord)}>
+                Edit
+              </button>
+              <button type="button" onClick={() => handleDelete(eventRecord)}>
+                Delete
+              </button>
+            </div>
+          </article>
+        );
+      })}
         </div>
       </section>
 

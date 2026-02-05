@@ -15,6 +15,10 @@ export type EventRecord = {
   actionKey?: string;
   actionCustom?: string;
   side?: '' | 'left' | 'right' | 'both';
+  drill1Key?: string;
+  drill1Custom?: string;
+  drill2Key?: string;
+  drill2Custom?: string;
   notes: string;
   createdAt: number;
   updatedAt: number;
